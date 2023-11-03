@@ -51,7 +51,7 @@ function multi_src_fg(model_full::AbstractModel, source::judiVector, dObs::judiV
                 src_coords, qIn, rec_coords, dObserved, t_sub=options.subsampling_factor,
                 space_order=options.space_order, checkpointing=options.optimal_checkpointing,
                 freq_list=freqs, ic=options.IC, is_residual=false, born_fwd=lin, nlind=nlind,
-                dft_sub=options.dft_subsampling_factor[1], f0=options.f0, return_obj=true, misfit=mfunc, illum=illum)
+                dft_sub=options.dft_subsampling_factor[1], f0=options.f0, return_obj=true, misfit=mfunc, illum=illum, par=options.par)
     end
 
     @juditime "Filter empty output" begin

@@ -130,7 +130,7 @@ def forward_op(p_params, tti, visco, elas, space_order, fw, spacing, save, t_sub
 
 @memoized_func
 def born_op(p_params, tti, visco, elas, space_order, fw, spacing, save, pt_src,
-            pt_rec, fs, t_sub, ws, nfreq, dft_sub, ic, nlind, illum):
+            pt_rec, fs, t_sub, ws, nfreq, dft_sub, ic, nlind, illum, par):
     """
     Low level born operator creation, to be used through `interface.py`
     Compute linearized wavefield U = J(m)* δ m
@@ -159,11 +159,11 @@ def born_op(p_params, tti, visco, elas, space_order, fw, spacing, save, pt_src,
     q = extented_src(model, wsrc, wavelet)
 
     # Set up PDE expression and rearrange
-    pde = wave_kernel(model, u, q=q, f0=f0, fw=fw)
+    pde = wave_kernel(model, u, q=q, f0=f0, fw=fw, par=par)
     if getattr(model, 'dm', 0) == 0:
         pdel = []
     else:
-        pdel = wave_kernel(model, ul, q=lin_src(model, u, ic=ic), f0=f0, fw=fw)
+        pdel = wave_kernel(model, ul, q=lin_src(model, u, ic=ic), f0=f0, fw=fw, par=par)
     # Setup source and receiver
     g_expr = geom_expr(model, u, rec_coords=rcords if nlind else None,
                        src_coords=scords, wavelet=wavelet, fw=fw)
@@ -186,7 +186,7 @@ def born_op(p_params, tti, visco, elas, space_order, fw, spacing, save, pt_src,
 
 @memoized_func
 def adjoint_born_op(p_params, tti, visco, elas, space_order, fw, spacing, pt_rec, fs, w,
-                    save, t_sub, nfreq, dft_sub, ic, illum):
+                    save, t_sub, nfreq, dft_sub, ic, illum, par):
     """
     Low level gradient operator creation, to be used through `propagators.py`
     Compute the action of the adjoint Jacobian onto a residual J'* δ d.
@@ -204,7 +204,7 @@ def adjoint_born_op(p_params, tti, visco, elas, space_order, fw, spacing, pt_rec
                           dft=nfreq > 0, t_sub=t_sub, fw=fw)
 
     # Set up PDE expression and rearrange
-    pde = wave_kernel(model, v, fw=False, f0=Constant('f0'))
+    pde = wave_kernel(model, v, fw=False, f0=Constant('f0'), par=par)
 
     # Setup source and receiver
     r_expr = geom_expr(model, v, src_coords=rcords, wavelet=residual, fw=not fw)

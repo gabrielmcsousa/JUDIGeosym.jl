@@ -181,7 +181,7 @@ def forward_wf_src_norec(model, u, par, space_order=8, f0=0.015, illum=False, fw
 
 
 # Pw*F'*Pr'*d_obs
-def adjoint_w(model, rec_coords, data, wavelet, space_order=8, f0=0.015, illum=False,
+def adjoint_w(model, rec_coords, data, wavelet, par, space_order=8, f0=0.015, illum=False,
               fw=True):
     """
     Adjoint/backward modeling of a shot record (receivers as source) for an
@@ -212,12 +212,12 @@ def adjoint_w(model, rec_coords, data, wavelet, space_order=8, f0=0.015, illum=F
         spatial distribution
     """
     w, _, I, _ = forward(model, rec_coords, None, data, wr=wavelet,
-                         space_order=space_order, f0=f0, illum=illum, fw=fw)
+                         space_order=space_order, f0=f0, illum=illum, fw=fw, par=par)
     return w.data, getattr(I, "data", None)
 
 
 # Linearized modeling ∂/∂m (Pr*F*Ps'*q)
-def born_rec(model, src_coords, wavelet, rec_coords,
+def born_rec(model, src_coords, wavelet, rec_coords, par,
              space_order=8, ic="as", f0=0.015, illum=False, fw=True):
     """
     Linearized (Born) modeling of a point source for a model perturbation
@@ -250,12 +250,12 @@ def born_rec(model, src_coords, wavelet, rec_coords,
         Shot record
     """
     rec, _, I, _ = born(model, src_coords, rec_coords, wavelet, save=False,
-                        space_order=space_order, ic=ic, f0=f0, illum=illum, fw=fw)
+                        space_order=space_order, ic=ic, f0=f0, illum=illum, fw=fw, par=par)
     return rec.data, getattr(I, "data", None)
 
 
 # ∂/∂m (Pr*F*Pw'*w)
-def born_rec_w(model, weight, wavelet, rec_coords,
+def born_rec_w(model, weight, wavelet, rec_coords, par,
                space_order=8, ic="as", f0=0.015, illum=False, fw=True):
     """
     Linearized (Born) modeling of an extended source for a model
@@ -288,11 +288,11 @@ def born_rec_w(model, weight, wavelet, rec_coords,
         Shot record
     """
     rec, _, I, _ = born(model, None, rec_coords, wavelet, save=False, ws=weight,
-                        space_order=space_order, ic=ic, f0=f0, illum=illum, fw=fw)
+                        space_order=space_order, ic=ic, f0=f0, illum=illum, fw=fw, par=par)
     return rec.data, getattr(I, "data", None)
 
 
-def J_adjoint(model, src_coords, wavelet, rec_coords, recin, space_order=8,
+def J_adjoint(model, src_coords, wavelet, rec_coords, recin, par, space_order=8,
               is_residual=False, checkpointing=False, n_checkpoints=None, t_sub=1,
               return_obj=False, freq_list=[], dft_sub=None, ic="as", illum=False,
               ws=None, f0=0.015, born_fwd=False, nlind=False, misfit=None, fw=True):
@@ -348,22 +348,22 @@ def J_adjoint(model, src_coords, wavelet, rec_coords, recin, space_order=8,
                                        space_order=8, is_residual=is_residual, ws=ws,
                                        n_checkpoints=n_checkpoints, ic=ic, f0=f0,
                                        nlind=nlind, return_obj=return_obj, illum=illum,
-                                       born_fwd=born_fwd, misfit=misfit, fw=fw)
+                                       born_fwd=born_fwd, misfit=misfit, fw=fw, par=par)
     elif freq_list is not None:
         return J_adjoint_freq(model, src_coords, wavelet, rec_coords, recin, ws=ws,
                               space_order=space_order, dft_sub=dft_sub, f0=f0, ic=ic,
                               freq_list=freq_list, is_residual=is_residual, nlind=nlind,
                               return_obj=return_obj, misfit=misfit, born_fwd=born_fwd,
-                              illum=illum, fw=fw)
+                              illum=illum, fw=fw, par=par)
     else:
         return J_adjoint_standard(model, src_coords, wavelet, rec_coords, recin,
                                   is_residual=is_residual, ic=ic, ws=ws, t_sub=t_sub,
                                   return_obj=return_obj, space_order=space_order,
                                   born_fwd=born_fwd, f0=f0, nlind=nlind,
-                                  illum=illum, misfit=misfit, fw=fw)
+                                  illum=illum, misfit=misfit, fw=fw, par=par)
 
 
-def J_adjoint_freq(model, src_coords, wavelet, rec_coords, recin, space_order=8,
+def J_adjoint_freq(model, src_coords, wavelet, rec_coords, recin, par, space_order=8,
                    freq_list=[], is_residual=False, return_obj=False, nlind=False,
                    dft_sub=None, ic="as", ws=None, born_fwd=False, f0=0.015,
                    misfit=None, illum=False, fw=True):
@@ -422,13 +422,13 @@ def J_adjoint_freq(model, src_coords, wavelet, rec_coords, recin, space_order=8,
                        is_residual=is_residual, misfit=misfit)
 
     g, Iv, _ = gradient(model, residual, rec_coords, u, space_order=space_order, ic=ic,
-                        freq=freq_list, dft_sub=dft_sub, f0=f0, illum=illum, fw=fw)
+                        freq=freq_list, dft_sub=dft_sub, f0=f0, illum=illum, fw=fw, par=par)
     if return_obj:
         return f, g.data, getattr(Iu, "data", None), getattr(Iv, "data", None)
     return g.data, getattr(Iu, "data", None), getattr(Iv, "data", None)
 
 
-def J_adjoint_standard(model, src_coords, wavelet, rec_coords, recin, space_order=8,
+def J_adjoint_standard(model, src_coords, wavelet, rec_coords, recin, par, space_order=8,
                        is_residual=False, return_obj=False, born_fwd=False, illum=False,
                        ic="as", ws=None, t_sub=1, nlind=False, f0=0.015, misfit=None,
                        fw=True):
@@ -477,21 +477,21 @@ def J_adjoint_standard(model, src_coords, wavelet, rec_coords, recin, space_orde
     ffunc = op_fwd_J[born_fwd]
     rec, u, Iu, _ = ffunc(model, src_coords, rec_coords, wavelet, save=True, nlind=nlind,
                           f0=f0, ws=ws, space_order=space_order, illum=illum, ic=ic,
-                          t_sub=t_sub, fw=fw)
+                          t_sub=t_sub, fw=fw, par=par)
 
     # Residual and gradient
     f, residual = Loss(rec, recin, model.critical_dt,
                        is_residual=is_residual, misfit=misfit)
 
     g, Iv, _ = gradient(model, residual, rec_coords, u, space_order=space_order, ic=ic,
-                        f0=f0, illum=illum, fw=fw)
+                        f0=f0, illum=illum, fw=fw, par=par)
 
     if return_obj:
         return f, g.data, getattr(Iu, "data", None), getattr(Iv, "data", None)
     return g.data, getattr(Iu, "data", None), getattr(Iv, "data", None)
 
 
-def J_adjoint_checkpointing(model, src_coords, wavelet, rec_coords, recin, space_order=8,
+def J_adjoint_checkpointing(model, src_coords, wavelet, rec_coords, recin, par, space_order=8,
                             is_residual=False, n_checkpoints=None, born_fwd=False,
                             return_obj=False, ic="as", ws=None, nlind=False, f0=0.015,
                             misfit=None, illum=False, fw=True):
@@ -549,7 +549,7 @@ def J_adjoint_checkpointing(model, src_coords, wavelet, rec_coords, recin, space
                                 ic=ic, nlind=nlind, ws=ws, f0=f0, illum=illum)
     op, g, kwg = gradient(model, recin, rec_coords, u, space_order=space_order,
                           return_op=True, ic=ic, f0=f0, save=False, illum=illum,
-                          fw=fw)
+                          fw=fw, par=par)
 
     nt = wavelet.shape[0]
     rec = Receiver(name='rec', grid=model.grid, ntime=nt, coordinates=rec_coords)
@@ -585,7 +585,7 @@ def J_adjoint_checkpointing(model, src_coords, wavelet, rec_coords, recin, space
 op_fwd_J = {False: forward, True: born}
 
 
-def wri_func(model, src_coords, wavelet, rec_coords, recin, yin, space_order=8,
+def wri_func(model, src_coords, wavelet, rec_coords, recin, yin, par, space_order=8,
              ic="as", ws=None, t_sub=1, grad="m", grad_corr=False,
              alpha_op=False, w_fun=None, eps=0, freq_list=[], wfilt=None, f0=0.015):
     """
@@ -603,7 +603,7 @@ def wri_func(model, src_coords, wavelet, rec_coords, recin, yin, space_order=8,
     # F(m0) * q if y is not an input and compute y = r(m0)
     if yin is None or grad_corr:
         y, u0, _, _ = forward(model, src_coords, rec_coords, wavelet, save=grad_corr,
-                              space_order=space_order, ws=ws, f0=f0)
+                              space_order=space_order, ws=ws, f0=f0, par=par)
         ydat = recin[:] - y.data[:]
     else:
         ydat = yin
@@ -611,7 +611,7 @@ def wri_func(model, src_coords, wavelet, rec_coords, recin, yin, space_order=8,
     # Compute wavefield vy = adjoint(F(m0))*y and norm on the fly
     srca, v, norm_v, _, _ = forward(model, rec_coords, src_coords, ydat,
                                     norm_wf=True, w_fun=w_fun, freq_list=freq_list,
-                                    save=not (grad is None or dft), f0=f0, fw=False)
+                                    save=not (grad is None or dft), f0=f0, fw=False, par=par)
     c1 = 1 / (recin.shape[1])
     c2 = np.log(np.prod(model.shape))
     # <PTy, d-F(m)*f> = <PTy, d>-<adjoint(F(m))*PTy, f>
@@ -632,7 +632,7 @@ def wri_func(model, src_coords, wavelet, rec_coords, recin, yin, space_order=8,
         w = c1*α/w**2 if w is not None else c1*α
         Q = wf_as_src(v, w=w, freq_list=freq_list)
         rcv, gradm, _ = forward_grad(model, src_coords, rec_coords, c2*wfilt,
-                                     freq=freq_list, q=Q, v=v, f0=f0)
+                                     freq=freq_list, q=Q, v=v, f0=f0, par=par)
 
         # Compute gradient wrt y
         if grad_corr or grad in ["all", "y"]:
@@ -644,7 +644,7 @@ def wri_func(model, src_coords, wavelet, rec_coords, recin, yin, space_order=8,
         if not grad_corr:
             gradm = gradm.data
         else:
-            gradm_corr, _, _ = gradient(model, grady, rec_coords, u0, f0=f0)
+            gradm_corr, _, _ = gradient(model, grady, rec_coords, u0, f0=f0, par=par)
             # Reduced gradient post-processing
             gradm = gradm.data + gradm_corr.data
 

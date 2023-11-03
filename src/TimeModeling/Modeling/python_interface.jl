@@ -117,7 +117,7 @@ function devito_interface(modelPy::PyObject, srcGeometry::Geometry, srcData::Arr
 
     # Devito call
     return wrapcall_data(ac."born_rec", modelPy, src_coords, qIn, rec_coords, fw=fw,
-                  space_order=options.space_order, ic=options.IC, f0=options.f0, illum=illum)
+                  space_order=options.space_order, ic=options.IC, f0=options.f0, illum=illum, par=options.par)
 end
 
 # dm = J'*d_lin
@@ -137,7 +137,7 @@ function devito_interface(modelPy::PyObject, srcGeometry::Geometry, srcData::Arr
                   src_coords, qIn, rec_coords, dIn, fw=fw, t_sub=options.subsampling_factor,
                   space_order=options.space_order, checkpointing=options.optimal_checkpointing,
                   freq_list=freqs, ic=options.IC, is_residual=true,
-                  dft_sub=options.dft_subsampling_factor[1], f0=options.f0, illum=illum)
+                  dft_sub=options.dft_subsampling_factor[1], f0=options.f0, illum=illum, par=options.par)
 end
 
 ######################################################################################################################################################
@@ -172,7 +172,7 @@ function devito_interface(modelPy::PyObject, recGeometry::Geometry, recData::Arr
 
     # Devito call
     return wrapcall_weights(ac."adjoint_w", modelPy, rec_coords, dIn, qIn,
-                            fw=fw, space_order=options.space_order, f0=options.f0, illum=illum)
+                            fw=fw, space_order=options.space_order, f0=options.f0, illum=illum, par=options.par)
 end
 
 # Jacobian of extended source modeling: d_lin = J*dm
@@ -189,7 +189,7 @@ function devito_interface(modelPy::PyObject, weights::Array, srcData::Array, rec
 
     # Devito call
     return wrapcall_data(ac."born_rec_w", modelPy, weights, qIn, rec_coords,
-                         fw=fw, space_order=options.space_order, ic=options.IC, f0=options.f0, illum=illum)
+                         fw=fw, space_order=options.space_order, ic=options.IC, f0=options.f0, illum=illum, par=options.par)
 end
 
 # Adjoint Jacobian of extended source modeling: dm = J'*d_lin
@@ -208,5 +208,5 @@ function devito_interface(modelPy::PyObject, weights::Array, srcData::Array, rec
                   nothing, qIn, rec_coords, dIn, fw=fw, t_sub=options.subsampling_factor,
                   space_order=options.space_order, checkpointing=options.optimal_checkpointing,
                   freq_list=freqs, ic=options.IC, ws=weights, is_residual=true,
-                  dft_sub=options.dft_subsampling_factor[1], f0=options.f0, illum=illum)
+                  dft_sub=options.dft_subsampling_factor[1], f0=options.f0, illum=illum, par=options.par)
 end

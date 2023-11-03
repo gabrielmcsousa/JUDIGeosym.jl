@@ -7,7 +7,7 @@ from FD_utils import laplacian, sa_tti
 from utils import D, S, vec, C_Matrix, gather
 
 
-def wave_kernel(model, u, par="lam-mu", fw=True, q=None, f0=0.015):
+def wave_kernel(model, u, par, fw=True, q=None, f0=0.015):
     """
     Pde kernel corresponding the the model for the input wavefield
 

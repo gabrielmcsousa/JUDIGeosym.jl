@@ -98,7 +98,7 @@ function twri_objective(model_full::AbstractModel, source::judiVector, dObs::jud
                 t_sub=options.subsampling_factor, space_order=options.space_order,
                 grad=optionswri.params, grad_corr=optionswri.grad_corr, eps=optionswri.eps,
                 alpha_op=optionswri.comp_alpha, w_fun=optionswri.weight_fun,
-                freq_list=freqs, wfilt=wfilt, f0=options.f0)
+                freq_list=freqs, wfilt=wfilt, f0=options.f0, par=options.par)
 
     if (optionswri.params in [:m, :all])
         gradm = remove_padding(gradm, modelPy.padsizes; true_adjoint=options.sum_padding)

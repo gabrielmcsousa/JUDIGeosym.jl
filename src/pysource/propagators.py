@@ -87,7 +87,7 @@ def adjoint(*args, **kwargs):
     return forward(*args, fw=fw, **kwargs)
 
 
-def gradient(model, residual, rcv_coords, u, return_op=False, space_order=8, fw=True,
+def gradient(model, residual, rcv_coords, u, par, return_op=False, space_order=8, fw=True,
              w=None, freq=None, dft_sub=None, ic="as", f0=0.015, save=True, illum=False):
     """
     Low level propagator, to be used through `interface.py`
@@ -110,7 +110,7 @@ def gradient(model, residual, rcv_coords, u, return_op=False, space_order=8, fw=
     op = adjoint_born_op(model.physical_parameters, model.is_tti, model.is_viscoacoustic,
                          model.is_elastic, space_order, fw, model.spacing,
                          rcv_coords is not None, model.fs, w, save, t_sub, nfreq(freq),
-                         dft_sub, ic, illum)
+                         dft_sub, ic, illum, par=par)
 
     # Update kwargs
     kw = base_kwargs(model.critical_dt)
@@ -132,7 +132,7 @@ def gradient(model, residual, rcv_coords, u, return_op=False, space_order=8, fw=
     return gradm, I, summary
 
 
-def born(model, src_coords, rcv_coords, wavelet, space_order=8, save=False,
+def born(model, src_coords, rcv_coords, wavelet, par, space_order=8, save=False,
          qwf=None, return_op=False, ic="as", freq_list=None, dft_sub=None,
          ws=None, t_sub=1, nlind=False, f0=0.015, illum=False, fw=True):
     """
@@ -160,7 +160,7 @@ def born(model, src_coords, rcv_coords, wavelet, space_order=8, save=False,
         op, u, _, kw = forward(model, src_coords, rcv_coords, wavelet,
                                space_order=space_order, save=save,
                                qwf=qwf, return_op=True, freq_list=freq_list,
-                               dft_sub=dft_sub, ws=ws, t_sub=t_sub, f0=f0, illum=illum)
+                               dft_sub=dft_sub, ws=ws, t_sub=t_sub, f0=f0, illum=illum, par=par)
 
         kw.update(fields_kwargs(rnl, I))
         if return_op:
@@ -173,7 +173,7 @@ def born(model, src_coords, rcv_coords, wavelet, space_order=8, save=False,
     op = born_op(model.physical_parameters, model.is_tti, model.is_viscoacoustic,
                  model.is_elastic, space_order, fw, model.spacing, save,
                  src_coords is not None, rcv_coords is not None, model.fs, t_sub,
-                 ws is not None, nfreq(freq_list), dft_sub, ic, nlind, illum)
+                 ws is not None, nfreq(freq_list), dft_sub, ic, nlind, illum, par=par)
 
     # Make kwargs
     kw = base_kwargs(model.critical_dt)
@@ -201,7 +201,7 @@ def born(model, src_coords, rcv_coords, wavelet, space_order=8, save=False,
 
 
 # Forward propagation
-def forward_grad(model, src_coords, rcv_coords, wavelet, v, space_order=8,
+def forward_grad(model, src_coords, rcv_coords, wavelet, v, par, space_order=8,
                  q=None, ws=None, ic="as", w=None, freq=None, f0=0.015, **kwargs):
     """
     Low level propagator, to be used through `interface.py`
@@ -218,7 +218,7 @@ def forward_grad(model, src_coords, rcv_coords, wavelet, v, space_order=8,
     q = extented_src(model, ws, wavelet, q=q)
 
     # Set up PDE expression and rearrange
-    pde = wave_kernel(model, u, q=q, f0=f0)
+    pde = wave_kernel(model, u, q=q, f0=f0, par=par)
 
     # Setup source and receiver
     rexpr = geom_expr(model, u, src_coords=src_coords, nt=nt,
