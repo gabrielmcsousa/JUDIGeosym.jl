@@ -407,7 +407,7 @@ class Model(object):
         # Elasic coefficient (see e.g )
         if self.is_elastic:
             so = max(self._space_order // 2, 2)
-            coeffs = fd_w(1, range(-so, so), .5)
+            coeffs = fd_w(1, range(-so, so+1), .5)
             c_fd = sum(np.abs(coeffs[-1][-1])) / 2
             return np.sqrt(self.dim) / self.dim / c_fd
         a1 = 4  # 2nd order in time
