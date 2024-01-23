@@ -9,11 +9,17 @@ PhysOrNot = Union{PhysicalParameter, Array, Nothing}
 function time_modeling(model_full::AbstractModel, srcGeometry::GeomOrNot, srcData::ArrayOrNot,
                        recGeometry::GeomOrNot, recData::ArrayOrNot, dm::PhysOrNot,
                        op::Symbol, options::JUDIOptions, fw::Bool)
-    # Load full geometry for out-of-core geometry containers
-    recGeometry = Geometry(recGeometry)
+    if options.mc
+        # Load full geometry for multi components scenario
+        recpGeometry = Geometry(recGeometry.rec_p)
+        recvGeometry = Geometry(recGeometry.rec_v)
+    else
+        # Load full geometry for out-of-core geometry containers
+        recGeometry = Geometry(recGeometry)
+    end
     srcGeometry = Geometry(srcGeometry)
 
-    # Reutrn directly for J*0
+    # Return directly for J*0
     if (op==:born && norm(dm) == 0)
         return judiVector(recGeometry, zeros(Float32, recGeometry.nt[1], length(recGeometry.xloc[1])))
     end
@@ -38,18 +44,31 @@ function time_modeling(model_full::AbstractModel, srcGeometry::GeomOrNot, srcDat
 
     # Remove receivers outside the modeling domain (otherwise leads to segmentation faults)
     @juditime "Remove OOB src/rec" begin
-        recGeometry, recData = remove_out_of_bounds_receivers(recGeometry, recData, model)
+        if options.mc
+            recpGeometry, recData = remove_out_of_bounds_receivers(recpGeometry, recData, model)
+            recvGeometry, recData = remove_out_of_bounds_receivers(recvGeometry, recData, model)
+        else
+            recGeometry, recData = remove_out_of_bounds_receivers(recGeometry, recData, model)
+        end
     end
 
     # Devito interface
     @juditime "Propagation" begin
-        argout = devito_interface(modelPy, srcGeometry, srcData, recGeometry, recData, dm, options, illum, fw)
+        if options.mc
+            argout = devito_interface(modelPy, srcGeometry, srcData, recpGeometry, recData, dm, options, illum, fw; recvGeometry=recvGeometry)
+        else
+            argout = devito_interface(modelPy, srcGeometry, srcData, recGeometry, recData, dm, options, illum, fw)
+        end
     end
-
     @juditime "Filter empty output" begin
         argout = filter_none(argout)
     end
-    argout = post_process(argout, modelPy, Val(op), recGeometry, options)
+
+    if modelPy.is_elastic
+        argout = post_process_isoelastic(argout, modelPy, Val(op), recGeometry, options)
+    else
+        argout = post_process(argout, modelPy, Val(op), recGeometry, options)
+    end
     argout = save_to_disk(argout, srcGeometry, srcData, options, Val(fw), Val(options.save_data_to_disk))
     return argout
 end
@@ -77,6 +96,22 @@ end
 
 post_process(v::AbstractArray{T}, modelPy::PyObject, ::Val{:born}, G::Geometry{T}, options::JUDIOptions) where {T<:Number} = judiVector{T, Matrix{T}}(1, G, [time_resample(v, calculate_dt(modelPy), G)])
 
+function post_process_isoelastic(t::Tuple, modelPy::PyObject, op::Val, G, o::JUDIOptions)
+    n_elem = modelPy.dim + 1
+    ret_tuple = ()
+   
+    if o.mc
+        ret_tuple = (ret_tuple..., post_process(t[1], modelPy, op, G.rec_p, o)) 
+        for i in 2:n_elem
+            ret_tuple = (ret_tuple..., post_process(t[i], modelPy, op, G.rec_v, o)) 
+        end
+    else
+        for i in 1:n_elem
+            ret_tuple = (ret_tuple..., post_process(t[i], modelPy, op, G, o)) 
+        end
+    end
+    return ret_tuple
+end
 # Saving to disk utilities
 save_to_disk(shot, args...) = shot
 save_to_disk(t::Tuple, args...) = save_to_disk(t[1], args...), Base.tail(t)...

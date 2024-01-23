@@ -73,7 +73,7 @@ class memoized_func(object):
 
 @memoized_func
 def forward_op(p_params, tti, visco, elas, space_order, fw, spacing, save, t_sub, fs,
-               pt_src, pt_rec, nfreq, dft_sub, ws, wr, full_q, nv_weights, illum):
+               pt_src, pt_rec, par):
     """
     Low level forward operator creation, to be used through `propagator.py`
     Compute forward wavefield u = A(m)^{-1}*f and related quantities (u(xrcv))
@@ -86,42 +86,21 @@ def forward_op(p_params, tti, visco, elas, space_order, fw, spacing, save, t_sub
     scords = np.ones((1, ndim)) if pt_src else None
     rcords = np.ones((1, ndim)) if pt_rec else None
     wavelet = np.ones((nt, 1))
-    freq_list = np.ones((nfreq,)) if nfreq > 0 else None
-    q = wavefield(model, 0, save=True, nt=nt, name="qwf") if full_q else 0
-    wsrc = Function(name='src_weight', grid=model.grid, space_order=0) if ws else None
-
+    
     # Setting forward wavefield
     u = wavefield(model, space_order, save=save, nt=nt, t_sub=t_sub, fw=fw)
 
-    # Expression for saving wavefield if time subsampling is used
-    eq_save = save_subsampled(model, u, nt, t_sub, space_order=space_order)
-
-    # Extended source
-    q = extented_src(model, wsrc, wavelet, q=q)
-
-    # Extended rec
-    wrec = extended_rec(model, wavelet if wr else None, u)
-
     # Set up PDE expression and rearrange
-    pde = wave_kernel(model, u, q=q, f0=Constant('f0'), fw=fw)
+    pde = wave_kernel(model, u, f0=Constant('f0'), fw=fw, par=par)
 
     # Setup source and receiver
     g_expr = geom_expr(model, u, src_coords=scords, nt=nt,
-                       rec_coords=rcords, wavelet=wavelet, fw=fw)
-
-    # On-the-fly Fourier
-    dft = otf_dft(u, freq_list, model.grid.time_dim.spacing, factor=dft_sub)
-
-    # Illumination
-    Ieq = illumexpr(u, illum)
-
-    # Wavefield norm
-    nv_t, nv_s = weighted_norm(u, weight=nv_weights) if nv_weights else ([], [])
-
+                       rec_coords=rcords, wavelet=wavelet, fw=fw, recv_coords=rcords)
     # Create operator and run
     subs = model.spacing_map
     pname = "forward" if fw else "adjoint"
-    op = Operator(pde + wrec + nv_t + dft + g_expr + eq_save + nv_s + Ieq,
+
+    op = Operator(pde + g_expr,
                   subs=subs, name=pname+name(model),
                   opt=opt_op(model))
     op.cfunction

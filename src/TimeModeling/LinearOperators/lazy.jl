@@ -1,4 +1,4 @@
-export judiProjection, judiWavelet, judiLRWF, judiRHS
+export judiProjection, judiPropagatorMC, judiWavelet, judiLRWF, judiRHS
 
 ############################################################################################################################
 # Abstract types
@@ -18,6 +18,12 @@ struct judiProjection{D} <: judiNoopOperator{D}
     geometry::Geometry
 end
 
+# Multi Components Projection operator 
+struct judiProjectionMC{D} <: judiNoopOperator{D}
+    j_proj_p::judiProjection
+    j_proj_v::judiProjection
+end
+
 # Wavelet "projection"
 struct judiWavelet{D} <: judiNoopOperator{D}
     m::AbstractSize
@@ -28,7 +34,7 @@ end
 
 # Poorly named backward compat
 const judiLRWF{T} = judiWavelet{T}
-const Projection{D} = Union{judiProjection{D}, judiWavelet{D}}
+const Projection{D} = Union{judiProjection{D}, judiWavelet{D}, judiProjectionMC{D}}
 const AdjointProjection{D} = jAdjoint{<:Projection{D}}
 
 """
@@ -93,6 +99,14 @@ Examples
 """
 judiProjection(G::Geometry) = judiProjection{Float32}(rec_space(G), time_space_src(get_nsrc(G), G.nt, 3), G)
 
+function judiProjection(G::GeometryMC) 
+    
+    j_proj_p = judiProjection{Float32}(rec_space(G.rec_p), time_space_src(get_nsrc(G.rec_p), G.rec_p.nt, 3), G.rec_p)
+    j_proj_v = judiProjection{Float32}(rec_space(G.rec_v), time_space_src(get_nsrc(G.rec_v), G.rec_v.nt, 3), G.rec_v)
+
+    return judiProjectionMC{Float32}(j_proj_p, j_proj_v)
+end
+
 """
     judiWavelet(dt, wavelet)
 
@@ -118,6 +132,7 @@ judiWavelet(::Integer, ::Array{T, N}) where {T<:AbstractFloat, N} = throw(Argume
 ############################################################################################################################
 # Base overload
 getproperty(P::judiProjection, s::Symbol) = s == :data ? P.geometry : getfield(P, s)
+getproperty(P::judiProjectionMC, s::Symbol) = s == :data ? Geometry(P.j_proj_p.geometry, P.j_proj_v.geometry) : getfield(P, s)
 getproperty(P::judiWavelet, s::Symbol) = s == :data ? P.wavelet : getfield(P, s)
 
 function getproperty(jA::jAdjoint, s::Symbol)
@@ -135,7 +150,19 @@ display(P::judiProjection{D}) where D = println("JUDI projection operator $(repr
 # Indexing
 getindex(jA::jAdjoint{T}, i) where T = jAdjoint{T}(jA.op[i])
 getindex(P::judiProjection{D}, i) where D = judiProjection{D}(P.m[i], P.n[i], P.geometry[i])
-getindex(P::judiProjection{D}, i::Integer) where D = judiProjection{D}(P.m[i], P.n[i], P.geometry[i:i])
+# getindex(P::judiProjection{D}, i::Integer) where D = judiProjection{D}(P.m[i], P.n[i], P.geometry[i:i])
+function getindex(P::judiProjectionMC{D}, i::Integer) where D  
+    m_v = P.j_proj_v.m[i]
+    n_v = P.j_proj_v.n[i]
+
+    m_p = P.j_proj_p.m[i]
+    n_p = P.j_proj_p.n[i]
+
+    j_p = judiProjection{D}(m_p, n_p, P.j_proj_p.geometry[i:i])
+    j_v = judiProjection{D}(m_v, n_v, P.j_proj_v.geometry[i:i])
+
+    judiProjectionMC{D}(j_p, j_v)
+end
 getindex(P::judiWavelet{D}, i) where D = judiWavelet{D}(P.m[i], P.n[i], P.wavelet[i], P.dt[i])
 getindex(P::judiWavelet{D}, i::Integer) where D = judiWavelet{D}(P.m[i], P.n[i], P.wavelet[i:i], P.dt[i:i])
 getindex(rhs::judiRHS{D}, i::Integer) where D = judiRHS{D}(length(i), rhs.P[i], rhs.d[i])

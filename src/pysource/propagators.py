@@ -9,13 +9,14 @@ from operators import forward_op, born_op, adjoint_born_op
 
 from devito import Operator, Function, Constant
 from devito.tools import as_tuple
+from sources import Receiver
 
 
 # Forward propagation
-def forward(model, src_coords, rcv_coords, wavelet, space_order=8, save=False,
+def forward(model, src_coords, rcv_coords, wavelet, par, space_order=8, save=False,
             qwf=None, return_op=False, freq_list=None, dft_sub=None,
             norm_wf=False, w_fun=None, ws=None, wr=None, t_sub=1, f0=0.015,
-            illum=False, fw=True, **kwargs):
+            illum=False, fw=True, mc=False, **kwargs):
     """
     Low level propagator, to be used through `interface.py`
     Compute forward wavefield u = A(m)^{-1}*f and related quantities (u(xrcv))
@@ -27,58 +28,56 @@ def forward(model, src_coords, rcv_coords, wavelet, space_order=8, save=False,
     u = wavefield(model, space_order, save=save, nt=nt, t_sub=t_sub, fw=fw)
 
     # Setup source and receiver
-    src, rcv = src_rec(model, u, src_coords, rcv_coords, wavelet, nt)
-
-    # Wavefield norm
-    nv_weights = weight_fun(w_fun, model, src_coords) if norm_wf else None
-
+    src, rcv = src_rec(model, u, src_coords, rcv_coords[0] if mc else rcv_coords, wavelet, nt)
     # Create operator and run
     op = forward_op(model.physical_parameters, model.is_tti, model.is_viscoacoustic,
                     model.is_elastic, space_order, fw, model.spacing, save,
-                    t_sub, model.fs, src_coords is not None, rcv_coords is not None,
-                    nfreq(freq_list), dft_sub, ws is not None,
-                    wr is not None, qwf is not None, nv_weights, illum)
+                    t_sub, model.fs, src_coords is not None, rcv_coords is not None, par)
 
+        # Illumination
+    I = illumination(u, illum)
+    
     # Make kwargs
     kw = base_kwargs(model.critical_dt)
-    f0q = Constant('f0', value=f0) if model.is_viscoacoustic else None
-
-    # Expression for saving wavefield if time subsampling is used
-    u_save = wavefield_subsampled(model, u, nt, t_sub, space_order=space_order)
-
-    # Illumination
-    I = illumination(u, illum)
-
-    # On-the-fly Fourier
-    dft_modes, fr = fourier_modes(u, freq_list)
-
-    # Extended source
-    ws, wst = lr_src_fields(model, ws, wavelet)
-
-    # Extended receiver
-    wr, wrt = lr_src_fields(model, None, wr, empty_w=True, rec=True)
-
-    # Norm v
-    nv2, nvt2 = norm_holder(u) if norm_wf else (None, None)
 
     # Update kwargs
-    fields = fields_kwargs(u, qwf, src, rcv, u_save, dft_modes, fr, ws, wst,
-                           wr, wrt, nv2, nvt2, f0q, I)
+    fields = fields_kwargs(u, src, rcv, I)
+
     kw.update(fields)
-    kw.update(model.physical_params())
+
+    parameters = model.physical_params()
+    # Pick specifics physical parameters from model unless explicitly provided
+    new_p = {k: v for k, v in parameters.items() if k not in remove_par[par]}
+
+    kw.update(new_p)
+
+    
+    if model.is_elastic:
+        rec_vx = Receiver(name="rec_vx", grid=model.grid, ntime=nt,
+                          coordinates=rcv_coords[1] if mc else rcv_coords)
+        rec_vz = Receiver(name="rec_vz", grid=model.grid, ntime=nt,
+                          coordinates=rcv_coords[1] if mc else rcv_coords)
+        kw.update(fields_kwargs(rec_vx, rec_vz))
+        if model.grid.dim == 3:
+                rec_vy = Receiver(name="rec_vy", grid=model.grid, ntime=nt,
+                                  coordinates=rcv_coords[1] if mc else rcv_coords)
+                kw.update(fields_kwargs(rec_vy))
 
     # Output
-    rout = wr or rcv
-    uout = dft_modes or (u_save if t_sub > 1 else u)
+    rec_tau = rcv
+    uout = u
 
     if return_op:
-        return op, uout, rout, kw
+        return op, uout, rec_tau, kw
 
     summary = op(**kw)
-
-    if norm_wf:
-        return rout, uout, nv2.data[0], I, summary
-    return rout, uout, I, summary
+    # if norm_wf:
+    #     return rout, uout, nv2.data[0], I, summary
+    if model.is_elastic:
+        if model.grid.dim == 3:
+            return (rec_tau, rec_vx, rec_vz, rec_vy), uout, I, summary
+        return (rec_tau, rec_vx, rec_vz), uout, I, summary
+    return rec_tau, uout, I, summary
 
 
 # legacy
@@ -240,3 +239,6 @@ def forward_grad(model, src_coords, rcv_coords, wavelet, v, space_order=8,
 
     # Output
     return rcv, gradm, summary
+
+remove_par = {'lam-mu': ['vp', 'vs', 'Ip', 'Is'], 'vp-vs-rho': ['lam', 'mu', 'Ip', 'Is'],
+              'Ip-Is-rho': ['lam', 'mu']}

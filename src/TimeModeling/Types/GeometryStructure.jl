@@ -40,8 +40,13 @@ mutable struct GeometryOOC{T} <: Geometry{T}
     segy_depth_key::String
 end
 
+mutable struct GeometryMC{T} <: Geometry{T}
+    rec_p::Geometry{T}
+    rec_v::Geometry{T}
+end
 
 display(G::Geometry) = println("$(typeof(G)) wiht $(length(G.nt)) sources")
+display(G::GeometryMC) = println("$(typeof(G))")
 show(io::IO, G::Geometry) = print(io, "$(typeof(G)) wiht $(length(G.nt)) sources")
 show(io::IO, ::MIME{Symbol("text/plain")}, G::Geometry) = println(io, "$(typeof(G)) wiht $(length(G.nt)) sources")
 
@@ -187,6 +192,10 @@ function Geometry(xloc::Array{T, 1}, yloc::CoordT, zloc::Array{T, 1}; dt=nothing
     return GeometryIC{T}(xlocCell, ylocCell, zlocCell, dtCell, ntCell, tCell)
 end
 
+
+function Geometry(geometry_p::Geometry{T}, geometry_v::Geometry{T}) where {T}
+    return GeometryMC{T}(geometry_p, geometry_v)
+end
 ################################################ Constructors from SEGY data  ####################################################
 
 # Utility function to prepare dtCell, ntCell, tCell from SEGY or based on user defined dt and t.
@@ -379,7 +388,16 @@ function getindex(geometry::GeometryIC{T}, srcnum::RangeOrVec) where T
     return geometry
 end
 
+# getindex multi-components geometry structure
+function getindex(geometry::GeometryMC{T}, srcnum::RangeOrVec) where T
+    rec_p = geometry.rec_p[srcnum]
+    rec_v = geometry.rec_v[srcnum]
+    geometry = GeometryMC{T}(rec_p, rec_v)
+    return geometry
+end
+
 getindex(geometry::GeometryIC{T}, srcnum::Integer) where T = getindex(geometry, srcnum:srcnum)
+getindex(geometry::GeometryMC{T}, srcnum::Integer) where T = getindex(geometry, srcnum:srcnum)
 
 # getindex out-of-core geometry structure
 getindex(geometry::GeometryOOC, srcnum) = Geometry(geometry.container[srcnum]; key=geometry.key, segy_depth_key=geometry.segy_depth_key, dt=geometry.dt[srcnum], t=geometry.t[srcnum])
